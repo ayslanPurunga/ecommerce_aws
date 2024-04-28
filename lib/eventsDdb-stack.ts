@@ -19,7 +19,7 @@ export class EventsDdbStack extends cdk.Stack {
                 type: dynamodb.AttributeType.STRING
             },
             sortKey: {
-                name: "pk",
+                name: "sk",
                 type: dynamodb.AttributeType.STRING
             },
             timeToLiveAttribute: "ttl",

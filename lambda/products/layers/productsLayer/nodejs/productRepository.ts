@@ -40,13 +40,32 @@ export class ProductRepository {
         }
     }
 
+    async getProductsByIds(productIds: string[]): Promise<Product[]> {
+        const keys: { id: string; }[] = []
+
+        productIds.forEach((productId) => {
+            keys.push({
+                id: productId
+            })
+        })
+
+        const data = await this.ddbClient.batchGet({
+            RequestItems: {
+                [this.productsDdb]: {
+                    Keys: keys
+                },
+            }
+        }).promise()
+        return data.Responses![this.productsDdb] as Product[]
+    }
+
     async create(product: Product): Promise<Product> {
         product.id = uuid()
         await this.ddbClient.put({
             TableName: this.productsDdb,
             Item: product
         }).promise()
-        return product 
+        return product
     }
 
     async deleteProduct(productId: string): Promise<Product> {
@@ -57,7 +76,7 @@ export class ProductRepository {
             },
             ReturnValues: "ALL_OLD"
         }).promise()
-        if(data.Attributes) {
+        if (data.Attributes) {
             return data.Attributes as Product
         } else {
             throw new Error("Product not found")

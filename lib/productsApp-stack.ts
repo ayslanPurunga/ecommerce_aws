@@ -1,6 +1,6 @@
 import * as lambda from "aws-cdk-lib/aws-lambda";
 
-import * as  lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
+import * as  lambdaNodeJS from "aws-cdk-lib/aws-lambda-nodejs";
 
 import * as cdk from "aws-cdk-lib";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb"
@@ -12,8 +12,8 @@ interface ProductsAppStackProps extends cdk.StackProps {
     eventsDdb: dynamodb.Table
 }
 export class ProductsAppStack extends cdk.Stack {
-    readonly productsFetchHandler: lambdaNodejs.NodejsFunction
-    readonly productsAdminHandler: lambdaNodejs.NodejsFunction
+    readonly productsFetchHandler: lambdaNodeJS.NodejsFunction
+    readonly productsAdminHandler: lambdaNodeJS.NodejsFunction
     readonly productsDdb: dynamodb.Table
 
     constructor(scope: Construct, id: string, props: ProductsAppStackProps) {
@@ -39,7 +39,7 @@ export class ProductsAppStack extends cdk.Stack {
         const productEventsLayerArn = ssm.StringParameter.valueForStringParameter(this, "ProductEventsLayerVersionArn")
         const productEventsLayer = lambda.LayerVersion.fromLayerVersionArn(this, "ProductEventsLayerVersionArn", productEventsLayerArn)
 
-        const productEventsHandler = new lambdaNodejs.NodejsFunction(this, "ProductsEventsFunction", {
+        const productEventsHandler = new lambdaNodeJS.NodejsFunction(this, "ProductsEventsFunction", {
             runtime: lambda.Runtime.NODEJS_20_X,
             functionName: "ProductsEventsFunction",
             entry: "lambda/products/productEventsFunction.ts",
@@ -60,7 +60,7 @@ export class ProductsAppStack extends cdk.Stack {
 
         props.eventsDdb.grantWriteData(productEventsHandler)
 
-        this.productsFetchHandler = new lambdaNodejs.NodejsFunction(this, "ProductsFetchFunction", {
+        this.productsFetchHandler = new lambdaNodeJS.NodejsFunction(this, "ProductsFetchFunction", {
             runtime: lambda.Runtime.NODEJS_20_X,
             functionName: "ProductsFetchFunction",
             entry: "lambda/products/productsFetchFunction.ts",
@@ -81,7 +81,7 @@ export class ProductsAppStack extends cdk.Stack {
 
         this.productsDdb.grantReadData(this.productsFetchHandler)
 
-        this.productsAdminHandler = new lambdaNodejs.NodejsFunction(this, "ProductsAdminFunction", {
+        this.productsAdminHandler = new lambdaNodeJS.NodejsFunction(this, "ProductsAdminFunction", {
             runtime: lambda.Runtime.NODEJS_20_X,
             functionName: "ProductsAdminFunction",
             entry: "lambda/products/productsAdminFunction.ts",
