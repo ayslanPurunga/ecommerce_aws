@@ -17,7 +17,7 @@ export interface Order {
         payment: 'CASH' | 'DEBIT_CARD' | 'CREDIT_CARD',
         totalPrice: number
     },
-    products: OrderProduct[]
+    products?: OrderProduct[]
 }
 
 export class OrderRepository {
@@ -39,7 +39,8 @@ export class OrderRepository {
 
     async getAllOrders(): Promise<Order[]> {
         const data = await this.ddbClient.scan({
-            TableName: this.ordersDdb
+            TableName: this.ordersDdb,
+            ProjectionExpression: "pk, sk, createdAt, shipping, billing"
         }).promise()
         return data.Items as Order[]
     }
@@ -50,7 +51,8 @@ export class OrderRepository {
             KeyConditionExpression: "pk = :email",
             ExpressionAttributeValues: {
                 ":email": email
-            }
+            },
+            ProjectionExpression: "pk, sk, createdAt, shipping, billing"
         }).promise()
         return data.Items as Order[]
     }
@@ -82,7 +84,7 @@ export class OrderRepository {
         if (data.Attributes) {
             return data.Attributes as Order
         } else {
-            throw new Error ('Order not found')
+            throw new Error('Order not found')
         }
     }
 
