@@ -4,7 +4,6 @@ import * as AWSXRay from "aws-xray-sdk"
 import { v4 as uuid } from "uuid"
 import { InvoiceTransactionStatus, InvoiceTransactionRepository } from "/opt/nodejs/invoiceTransaction"
 import { InvoiceWSService } from "/opt/nodejs/invoiceWSConnection";
-import { url } from "inspector";
 
 AWSXRay.captureAWS(require('aws-sdk'))
 
@@ -51,7 +50,7 @@ export async function handler(event: APIGatewayProxyEvent, context: Context): Pr
         timestamp: timestamp,
         expiresIn: expires,
         connectionId: connectionId,
-        endPoint: invoicesWsApiEndpoint
+        endpoint: invoicesWsApiEndpoint
 
     })
 

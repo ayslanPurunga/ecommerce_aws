@@ -6,7 +6,8 @@ export enum InvoiceTransactionStatus {
     PROCESSED = "INVOICE_PROCESSED",
     TIMEOUT = "TIMEOUT",
     CANCELLED = "INVOICE_CANCELLED",
-    NON_VALID_INVOICE_NUMBER = "NON_VALID_INVOICE_NUMBER"
+    NON_VALID_INVOICE_NUMBER = "NON_VALID_INVOICE_NUMBER",
+    NOT_FOUND = "NOT_FOUND"
 }
 
 
@@ -18,7 +19,7 @@ export interface InvoiceTransaction {
     timestamp: number;
     expiresIn: number;
     connectionId: string;
-    endPoint: string;
+    endpoint: string;
     transactionStatus: InvoiceTransactionStatus
 }
 
@@ -40,5 +41,41 @@ export class InvoiceTransactionRepository {
         return invoiceTransaction
 
         
+    }
+
+    async getInvoiceTransaction(key: string): Promise<InvoiceTransaction> {
+        const data = await this.ddbClient.get({
+            TableName: this.invoiceTransactionDdb,
+            Key: {
+                pk: "#transaction",
+                sk: key
+            }
+        }).promise()
+        if (data.Item) {
+            return data.Item as InvoiceTransaction
+        } else {
+            throw new Error("Invoice transaction not found")
+        }
+    }
+
+    async updateInvoiceTransaction(key: string, status: InvoiceTransactionStatus): Promise<boolean> {
+        try {
+            await this.ddbClient.update({
+                TableName: this.invoiceTransactionDdb,
+                Key: {
+                    pk: "#transaction",
+                    sk: key
+                },
+                ConditionExpression: 'attribute_exists(pk)',
+                UpdateExpression: 'set transactionStatus = :s',
+                ExpressionAttributeValues: {
+                    ':s': status
+                }
+            }).promise()
+            return true
+        } catch (ConditionalCheckFailedException) {
+            console.error('Invoice transaction not found')
+            return false 
+        }
     }
 }

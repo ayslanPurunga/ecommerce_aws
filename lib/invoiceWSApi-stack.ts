@@ -24,7 +24,7 @@ export class InvoiceWSApiStack extends cdk.Stack {
 
         // invoice WebSocket API Layer
         const invoiceWSConnectionLayerArn = ssm.StringParameter.valueForStringParameter(this, "InvoiceWSConnectionLayerVersionArn")
-        const invoiceWSConnectionLayer = lambda.LayerVersion.fromLayerVersionArn(this, "InvoiceWSConnectionLayer", invoiceLayerArn)
+        const invoiceWSConnectionLayer = lambda.LayerVersion.fromLayerVersionArn(this, "InvoiceWSConnectionLayer", invoiceWSConnectionLayerArn)
 
         // invoice e invoice transaction DDB
         const invoicesDdb = new dynamodb.Table(this, "InvoicesDdb", {
