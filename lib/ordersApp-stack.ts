@@ -9,6 +9,9 @@ import * as iam from "aws-cdk-lib/aws-iam"
 import * as sqs from "aws-cdk-lib/aws-sqs"
 import * as lambdaEventSource from "aws-cdk-lib/aws-lambda-event-sources"
 import * as event from 'aws-cdk-lib/aws-events'
+import * as logs from "aws-cdk-lib/aws-logs"
+import * as cw from "aws-cdk-lib/aws-cloudwatch"
+import * as cw_actions from "aws-cdk-lib/aws-cloudwatch-actions"
 import { Construct } from 'constructs'
 
 interface OrdersAppStackProps extends cdk.StackProps {
@@ -39,6 +42,21 @@ export class OrdersAppStack extends cdk.Stack {
             writeCapacity: 1
         })
 
+        const writeThrottleEventsMetric = ordersDdb.metric('WriteThrottleEvents', {
+            period: cdk.Duration.minutes(2),
+            statistic: 'SampleCount',
+            unit: cw.Unit.COUNT
+        })
+        writeThrottleEventsMetric.createAlarm(this, 'WriteThrottleEventsAlarm', {
+            alarmName: "WriteThrottleEvents",
+            actionsEnabled: false,
+            evaluationPeriods: 1,
+            threshold: 10,
+            comparisonOperator:
+                cw.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            treatMissingData: cw.TreatMissingData.NOT_BREACHING
+        })
+
         // Orders Layer
         const ordersLayerArn = ssm.StringParameter.valueForStringParameter(this, "OrdersLayerVersionArn")
         const ordersLayer = lambda.LayerVersion.fromLayerVersionArn(this, "OrdersLayerVersionArn", ordersLayerArn)
@@ -58,6 +76,10 @@ export class OrdersAppStack extends cdk.Stack {
         // Products Layer
         const productsLayerArn = ssm.StringParameter.valueForStringParameter(this, "ProductsLayerVersionArn")
         const productsLayer = lambda.LayerVersion.fromLayerVersionArn(this, "ProductsLayerVersionArn", productsLayerArn)
+
+        // Auth user info layer
+        const authUserInfoLayerArn = ssm.StringParameter.valueForStringParameter(this, "AuthUserInfoLayerVersionArn")
+        const authUserInfoLayer = lambda.LayerVersion.fromLayerVersionArn(this, "AuthUserInfoLayerVersionArn", authUserInfoLayerArn)
 
         const ordersTopic = new sns.Topic(this, "OrderEventsTopic", {
             displayName: "Order events topic",
@@ -81,15 +103,46 @@ export class OrdersAppStack extends cdk.Stack {
                 ORDER_EVENTS_TOPIC_ARN: ordersTopic.topicArn,
                 AUDIT_BUS_NAME: props.auditBus.eventBusName
             },
-            layers: [ordersLayer, productsLayer, ordersApiLayer, orderEventsLayer],
+            layers: [ordersLayer, productsLayer, ordersApiLayer, orderEventsLayer, authUserInfoLayer],
             tracing: lambda.Tracing.ACTIVE,
-            insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0
+            // insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0
         })
 
         ordersDdb.grantReadWriteData(this.ordersHandler)
         props.productsDdb.grantReadData(this.ordersHandler)
         ordersTopic.grantPublish(this.ordersHandler)
         props.auditBus.grantPutEventsTo(this.ordersHandler)
+
+        //Metric
+        const productNotFoundMetricFilter =
+            this.ordersHandler.logGroup.addMetricFilter('ProductNotFound', {
+                metricName: "OrderWithNonValidProduct",
+                metricNamespace: "ProductNotFound",
+                filterPattern: logs.FilterPattern.literal('Some product was not found')
+            })
+
+        //Alarm
+        const productNotFoundAlarm = productNotFoundMetricFilter.metric().with({
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(2)
+        })
+            .createAlarm(this, 'ProductNotFoundAlarm', {
+                alarmName: 'OrderWithNonValidProduct',
+                alarmDescription: "Some product was not found while creating a new order",
+                evaluationPeriods: 1,
+                threshold: 2,
+                actionsEnabled: true,
+                comparisonOperator:
+                    cw.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
+            })
+
+        //Action 
+        const orderAlarmsTopic = new sns.Topic(this, "OrderAlarmsTopic", {
+            displayName: "Order alarms topic",
+            topicName: "order-alarms"
+        })
+        orderAlarmsTopic.addSubscription(new subs.EmailSubscription("lukskill@hotmail.com"))
+        productNotFoundAlarm.addAlarmAction(new cw_actions.SnsAction(orderAlarmsTopic))
 
         const orderEventsHandler = new lambdaNodeJS.NodejsFunction(this, 'OrderEventsFunction', {
             runtime: lambda.Runtime.NODEJS_20_X,
